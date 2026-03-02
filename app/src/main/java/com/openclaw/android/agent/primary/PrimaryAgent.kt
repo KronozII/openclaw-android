@@ -234,11 +234,10 @@ class PrimaryAgent @Inject constructor(
     }
 
     private fun buildPrompt(system: String, user: String): String {
-        // Gemma 2 instruction format
         return "<start_of_turn>user\n$system\n\n$user<end_of_turn>\n<start_of_turn>model\n"
     }
 
     companion object {
-        const val DEFAULT_SYSTEM_PROMPT = "You are OpenClaw, a helpful on-device AI assistant. No data leaves the device unless the user explicitly permits it. You are honest, helpful, and always ask before accessing any sensitive resource. If you need to access the web, files, camera, contacts, or any external resource, say so clearly and the system will ask the user for permission before proceeding. Keep responses concise and useful."
+        const val DEFAULT_SYSTEM_PROMPT = "You are OpenClaw, a helpful on-device AI assistant."
     }
 }

@@ -1,0 +1,34 @@
+# Built artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Build dirs
+build/
+.gradle/
+local.properties
+
+# Android Studio
+*.iml
+.idea/
+*.swp
+*.swo
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystore (never commit these)
+*.jks
+*.keystore
+
+# Model files (too large for git)
+*.bin
+*.gguf
+*.tflite
+app/src/main/assets/models/
+app/src/main/java/com/openclaw/android/util/
+
+# OS
+.DS_Store
+Thumbs.db

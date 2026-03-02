@@ -28,30 +28,8 @@ object AppModule {
     fun provideDatabase(
         @ApplicationContext context: Context,
     ): OpenClawDatabase {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-
-        // Use EncryptedSharedPreferences to store the DB passphrase
-        val prefs = EncryptedSharedPreferences.create(
-            context,
-            "openclaw_vault_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
-
-        val passphraseKey = "db_passphrase"
-        val passphrase = prefs.getString(passphraseKey, null) ?: run {
-            // Generate a new random 32-byte passphrase on first install
-            val bytes = java.security.SecureRandom().generateSeed(32)
-            val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-            prefs.edit().putString(passphraseKey, encoded).apply()
-            encoded
-        }
-
-        return OpenClawDatabase.create(context, passphrase.toByteArray(Charsets.UTF_8))
-    }
+        return OpenClawDatabase.create(context)
+}
 
     @Provides fun provideScopeTokenDao(db: OpenClawDatabase) = db.scopeTokenDao()
     @Provides fun provideAuditLogDao(db: OpenClawDatabase) = db.auditLogDao()

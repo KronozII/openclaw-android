@@ -79,7 +79,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.sqlcipher)
     implementation(libs.security.crypto)
     implementation(libs.mediapipe.tasks.genai)
     implementation(libs.androidx.datastore)

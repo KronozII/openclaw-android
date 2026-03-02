@@ -190,7 +190,7 @@ fun ChatScreen(
                 visible = activeAlerts.isNotEmpty(),
                 enter = slideInVertically() + fadeIn(),
                 exit = slideOutVertically() + fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter).zIndex(10f),
+                modifier = Modifier.align(Alignment.TopCenter),
             ) {
                 ThreatAlertBanner(
                     alerts = activeAlerts,

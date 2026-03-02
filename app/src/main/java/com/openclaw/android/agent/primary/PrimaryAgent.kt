@@ -175,40 +175,30 @@ class PrimaryAgent @Inject constructor(
         val responseBuilder = StringBuilder()
 
         try {
-            // Streaming inference — tokens emitted as they're generated
-            inference.generateResponseAsync(fullPrompt) { partialResult, done ->
-                agentScope.launch {
-                    if (!partialResult.isNullOrEmpty()) {
-                        responseBuilder.append(partialResult)
-                        _state.value = AgentState.Generating(responseBuilder.toString())
-                        _events.emit(AgentEvent.TokenOutput(partialResult))
-                    }
-                    if (done) {
-                        val fullResponse = responseBuilder.toString()
+            val fullResponse = inference.generateResponse(fullPrompt)
 
-                        // Persist assistant response
-                        chatDao.insertMessage(
-                            ChatMessageEntity(
-                                id = UUID.randomUUID().toString(),
-                                sessionId = sessionId,
-                                role = "assistant",
-                                content = fullResponse,
-                                timestamp = System.currentTimeMillis(),
-                            )
-                        )
-                        chatDao.touchSession(sessionId, System.currentTimeMillis())
+            responseBuilder.append(fullResponse)
+            _state.value = AgentState.Generating(responseBuilder.toString())
+            _events.emit(AgentEvent.TokenOutput(fullResponse))
 
-                        _state.value = AgentState.Ready(currentModel!!)
-                        _events.emit(AgentEvent.GenerationComplete(fullResponse))
-                    }
-                }
-            }
+            chatDao.insertMessage(
+                ChatMessageEntity(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    role = "assistant",
+                    content = fullResponse,
+                    timestamp = System.currentTimeMillis(),
+                )
+            )
+            chatDao.touchSession(sessionId, System.currentTimeMillis())
+
+            _state.value = AgentState.Ready(currentModel!!)
+            _events.emit(AgentEvent.GenerationComplete(fullResponse))
         } catch (e: Exception) {
             _state.value = AgentState.Error(e.message ?: "Generation failed")
             _events.emit(AgentEvent.Error(e.message ?: "Unknown inference error"))
             Log.e(TAG, "Generation error", e)
         }
-    }
 
     /**
      * Request a privileged action on behalf of the model's response.

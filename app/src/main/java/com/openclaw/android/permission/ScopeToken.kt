@@ -7,9 +7,6 @@ import java.security.KeyStore
 import javax.crypto.KeyGenerator
 import javax.crypto.Mac
 import javax.crypto.SecretKey
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * Scope types — every possible permission category
@@ -33,7 +30,6 @@ enum class ScopeType(val prefix: String, val displayName: String, val icon: Stri
 /**
  * A single granted scope — HMAC-signed, stored in PermissionVault
  */
-@Serializable
 data class ScopeToken(
     val id: String,                    // uuid
     val scopeType: String,             // ScopeType.prefix

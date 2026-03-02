@@ -85,12 +85,7 @@ fun PermissionsScreen(
                 selectedTabIndex = selectedTab,
                 containerColor = SurfaceDark,
                 contentColor = ClawGreen,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = ClawGreen,
-                    )
-                }
+                indicator = {}
             ) {
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
                     Text("GRANTS", fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.padding(12.dp))

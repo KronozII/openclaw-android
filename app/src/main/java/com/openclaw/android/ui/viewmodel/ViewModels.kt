@@ -15,7 +15,6 @@ import com.openclaw.android.permission.PermissionVault
 import com.openclaw.android.storage.db.AuditLogDao
 import com.openclaw.android.storage.db.ChatDao
 import com.openclaw.android.storage.models.ChatMessageEntity
-import com.openclaw.android.storage.models.ScopeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch

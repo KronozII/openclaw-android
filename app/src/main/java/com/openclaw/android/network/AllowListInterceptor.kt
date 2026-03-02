@@ -65,7 +65,7 @@ class AllowListInterceptor @Inject constructor(
             Log.w(TAG, "BLOCKED unauthorized request to: $host")
             logAccess(host, url, allowed = false)
             // Surface a permission request to UI asynchronously
-            kotlinx.coroutines.GlobalScope.kotlinx.coroutines.launch(kotlinx.coroutines.Dispatchers.IO) {
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 vault.requireScope(
                     scopeType = ScopeType.NETWORK,
                     resource = host,

@@ -52,7 +52,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(model.displayName, color = TextPrimary, fontSize = 14.sp)
                                 Text(
-                                    "${model.ramRequiredMb}MB RAM · ${model.fileName}",
+                                    model.fileName,
                                     color = TextMuted,
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace,

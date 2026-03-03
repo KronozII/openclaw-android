@@ -157,3 +157,27 @@ class SandboxViewModel @Inject constructor(
         }
     }
 }
+
+@HiltViewModel
+class SkillsViewModel @Inject constructor(
+    private val skillEngine: com.openclaw.android.skill.SkillEngine,
+) : ViewModel() {
+    val activeSkills = skillEngine.activeSkills
+    fun toggleSkill(id: String) {
+        if (activeSkills.value.any { it.id == id }) skillEngine.disableSkill(id)
+        else skillEngine.enableSkill(id)
+    }
+    fun buildCustomSkill(name: String, description: String, prompt: String) {
+        val skill = skillEngine.buildSkillFromDescription(name, description, com.openclaw.android.skill.SkillCategory.CUSTOM, prompt)
+        skillEngine.installCustomSkill(skill)
+    }
+}
+
+@HiltViewModel
+class MemoryViewModel @Inject constructor(
+    private val memory: com.openclaw.android.memory.LongTermMemory,
+) : ViewModel() {
+    val memories = memory.memories
+    fun deleteMemory(id: String) = memory.deleteMemory(id)
+    fun clearAll() = memory.clearAll()
+}

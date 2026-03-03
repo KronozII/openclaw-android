@@ -1,3 +1,9 @@
+#!/bin/bash
+BASE="app/src/main/java/com/openclaw/android"
+
+rm -f $BASE/ui/screens/SettingsScreen.kt
+
+cat > $BASE/ui/screens/SettingsScreen.kt << 'SETTINGSEOF'
 package com.openclaw.android.ui.screens
 
 import android.app.DownloadManager
@@ -241,3 +247,8 @@ fun SettingsScreen() {
         }
     }
 }
+SETTINGSEOF
+echo "✓ SettingsScreen.kt ($(wc -l < $BASE/ui/screens/SettingsScreen.kt) lines)"
+echo ""
+echo "Run: git add -A && git commit -m 'fix settings crash Android 14 receiver flag' && git push"
+

@@ -3,9 +3,12 @@ package com.openclaw.android.memory
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -28,6 +31,7 @@ class LongTermMemory @Inject constructor(
 ) {
     private val TAG = "LongTermMemory"
     private val memoryFile = File(context.filesDir, "memory/memories.json")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _memories = MutableStateFlow<List<Memory>>(emptyList())
     val memories: StateFlow<List<Memory>> = _memories
@@ -53,16 +57,20 @@ class LongTermMemory @Inject constructor(
             }
             _memories.value = loaded
             Log.i(TAG, "Loaded ${loaded.size} memories")
-        } catch (e: Exception) { Log.e(TAG, "Error loading memories", e) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading memories", e)
+        }
     }
 
     suspend fun remember(content: String, summary: String, category: String = "general", importance: Float = 0.5f) {
         withContext(Dispatchers.IO) {
             val memory = Memory(
                 id = java.util.UUID.randomUUID().toString(),
-                content = content, summary = summary,
+                content = content,
+                summary = summary,
                 timestamp = System.currentTimeMillis(),
-                category = category, importance = importance,
+                category = category,
+                importance = importance,
             )
             val current = _memories.value.toMutableList()
             current.add(0, memory)
@@ -92,22 +100,31 @@ class LongTermMemory @Inject constructor(
         val current = _memories.value.toMutableList()
         current.removeAll { it.id == id }
         _memories.value = current
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) { saveMemories(current) }
+        scope.launch { saveMemories(current) }
     }
 
-    fun clearAll() { _memories.value = emptyList(); memoryFile.delete() }
+    fun clearAll() {
+        _memories.value = emptyList()
+        memoryFile.delete()
+    }
 
     private fun saveMemories(memories: List<Memory>) {
         try {
             val json = JSONArray()
             memories.forEach { m ->
                 json.put(JSONObject().apply {
-                    put("id", m.id); put("content", m.content); put("summary", m.summary)
-                    put("timestamp", m.timestamp); put("category", m.category); put("importance", m.importance)
+                    put("id", m.id)
+                    put("content", m.content)
+                    put("summary", m.summary)
+                    put("timestamp", m.timestamp)
+                    put("category", m.category)
+                    put("importance", m.importance)
                 })
             }
             memoryFile.parentFile?.mkdirs()
             memoryFile.writeText(json.toString())
-        } catch (e: Exception) { Log.e(TAG, "Error saving memories", e) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving memories", e)
+        }
     }
 }

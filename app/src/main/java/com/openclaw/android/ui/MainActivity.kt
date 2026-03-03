@@ -15,7 +15,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.openclaw.android.ui.screens.*
+import com.openclaw.android.ui.screens.ChatScreen
+import com.openclaw.android.ui.screens.MemoryScreen
+import com.openclaw.android.ui.screens.PermissionsScreen
+import com.openclaw.android.ui.screens.SettingsScreen
+import com.openclaw.android.ui.screens.SkillsScreen
 import com.openclaw.android.ui.theme.OpenClawTheme
 import com.openclaw.android.ui.theme.ClawGreen
 import com.openclaw.android.ui.theme.TextMuted
@@ -43,25 +47,39 @@ fun OpenClawApp() {
         Triple("settings", "⚙️", "Settings"),
     )
 
-    Scaffold(bottomBar = {
-        NavigationBar(containerColor = Color(0xFF0F0F1A)) {
-            navItems.forEach { (route, icon, label) ->
-                NavigationBarItem(
-                    selected = currentRoute == route,
-                    onClick = { navController.navigate(route) { launchSingleTop = true } },
-                    icon = { Text(icon, fontSize = 18.sp) },
-                    label = { Text(label, fontSize = 9.sp, fontFamily = FontFamily.Monospace) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = ClawGreen, selectedTextColor = ClawGreen,
-                        unselectedIconColor = TextMuted, unselectedTextColor = TextMuted,
-                        indicatorColor = Color(0xFF16162A),
-                    ),
-                )
+    Scaffold(
+        bottomBar = {
+            NavigationBar(containerColor = Color(0xFF0F0F1A)) {
+                navItems.forEach { (route, icon, label) ->
+                    NavigationBarItem(
+                        selected = currentRoute == route,
+                        onClick = { navController.navigate(route) { launchSingleTop = true } },
+                        icon = { Text(icon, fontSize = 18.sp) },
+                        label = { Text(label, fontSize = 9.sp, fontFamily = FontFamily.Monospace) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = ClawGreen,
+                            selectedTextColor = ClawGreen,
+                            unselectedIconColor = TextMuted,
+                            unselectedTextColor = TextMuted,
+                            indicatorColor = Color(0xFF16162A),
+                        ),
+                    )
+                }
             }
         }
-    }) { padding ->
-        NavHost(navController = navController, startDestination = "chat", modifier = Modifier.padding(padding)) {
-            composable("chat") { ChatScreen() }
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = "chat",
+            modifier = Modifier.padding(padding),
+        ) {
+            composable("chat") {
+                ChatScreen(
+                    onOpenSettings = { navController.navigate("settings") },
+                    onOpenPermissions = { navController.navigate("permissions") },
+                    onOpenSandbox = { navController.navigate("skills") },
+                )
+            }
             composable("skills") { SkillsScreen() }
             composable("memory") { MemoryScreen() }
             composable("permissions") { PermissionsScreen() }

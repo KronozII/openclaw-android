@@ -34,7 +34,7 @@ class AllowListInterceptor @Inject constructor(
         if (host in permanentAllowList) return chain.proceed(request)
 
         val isGranted = runBlocking {
-            vault.hasActiveScope(ScopeType.NETWORK, host)
+            vault.isGranted(ScopeType.NETWORK, host)
         }
 
         return if (isGranted) {

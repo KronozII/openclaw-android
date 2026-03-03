@@ -40,9 +40,9 @@ class AllowListInterceptor @Inject constructor(
         return if (isGranted) {
             logAccess(host, url, allowed = true)
             val response = chain.proceed(request)
-            inspectResponseForExfiltration(request, response)
+            inspectResponse(request, response)
         } else {
-            Log.w(TAG, "BLOCKED unauthorized request to: $host")
+            Log.w(TAG, "BLOCKED: $host")
             logAccess(host, url, allowed = false)
             scope.launch {
                 vault.requireScope(
@@ -56,16 +56,15 @@ class AllowListInterceptor @Inject constructor(
                 .request(request)
                 .protocol(okhttp3.Protocol.HTTP_1_1)
                 .code(403)
-                .message("Blocked by OpenClaw AllowList")
+                .message("Blocked by OpenClaw")
                 .body("Blocked".toResponseBody())
                 .build()
         }
     }
 
-    private fun inspectResponseForExfiltration(request: okhttp3.Request, response: Response): Response {
-        val contentLength = response.body?.contentLength() ?: 0
-        if (contentLength > 50 * 1024) {
-            Log.w(TAG, "LARGE response from ${request.url.host}: $contentLength bytes")
+    private fun inspectResponse(request: okhttp3.Request, response: Response): Response {
+        val len = response.body?.contentLength() ?: 0
+        if (len > 50 * 1024) {
             scope.launch {
                 auditLogDao.insert(AuditLogEntry(
                     agentId = "AllowListInterceptor",
@@ -73,7 +72,7 @@ class AllowListInterceptor @Inject constructor(
                     resource = request.url.host,
                     outcome = "FLAGGED",
                     threatLevel = "HIGH",
-                    details = "Large outbound payload: $contentLength bytes",
+                    details = "Large payload: $len bytes",
                 ))
             }
         }

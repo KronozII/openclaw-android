@@ -21,6 +21,8 @@ import com.champengine.android.network.ChampEngineClient
 import com.champengine.android.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun OnboardingScreen(
@@ -60,7 +62,7 @@ fun OnboardingScreen(
         delay(600)
         var errorMsg = "unknown"
         val ok = try {
-            client.ping()
+            withContext(Dispatchers.IO) { client.ping() }
         } catch (e: java.net.UnknownHostException) {
             errorMsg = "DNS_FAIL: " + (e.message ?: "null")
             false
@@ -183,7 +185,7 @@ fun OnboardingScreen(
                         isChecking = true
                         scope.launch {
                             status = "Retrying..."
-                            val ok = client.ping()
+                            val ok = withContext(Dispatchers.IO) { client.ping() }
                             isChecking = false
                             if (ok) {
                                 isConnected = true

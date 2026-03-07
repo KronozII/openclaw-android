@@ -21,10 +21,10 @@ import javax.inject.Singleton
 @Singleton
 class ChampEngineClient @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val http: OkHttpClient,
 ) {
     private val TAG = "ChampEngineClient"
 
-    // ── Baked-in defaults — users never need to configure anything ──
     private val DEFAULT_ENDPOINT = "https://api.champengine.cloud"
     private val DEFAULT_TOKEN    = "eb0845f1d07fa481e941e4733b90de348e17ef95afa60b7c4f524905bbe1fd2a"
     private val DEFAULT_MODEL    = "llama3.2:3b"
@@ -32,13 +32,6 @@ class ChampEngineClient @Inject constructor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("champengine_config", Context.MODE_PRIVATE)
 
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(180, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build()
-
-    // ── Config — users can override, but defaults work out of box ──
     fun getEndpoint(): String = prefs.getString("endpoint", DEFAULT_ENDPOINT) ?: DEFAULT_ENDPOINT
     fun getToken(): String    = prefs.getString("token", DEFAULT_TOKEN) ?: DEFAULT_TOKEN
     fun getModel(): String    = prefs.getString("model", DEFAULT_MODEL) ?: DEFAULT_MODEL
@@ -58,7 +51,6 @@ class ChampEngineClient @Inject constructor(
     fun isUsingDefaults(): Boolean =
         getEndpoint() == DEFAULT_ENDPOINT && getToken() == DEFAULT_TOKEN
 
-    // ── Health check ──────────────────────────────────────────────
     suspend fun ping(): Boolean {
         return try {
             val req = Request.Builder()
@@ -73,7 +65,6 @@ class ChampEngineClient @Inject constructor(
         }
     }
 
-    // ── List available models ─────────────────────────────────────
     suspend fun listModels(): List<String> {
         return try {
             val req = Request.Builder()
@@ -91,7 +82,6 @@ class ChampEngineClient @Inject constructor(
         }
     }
 
-    // ── Streaming chat ────────────────────────────────────────────
     fun streamChat(
         messages: List<Pair<String, String>>,
         systemPrompt: String,

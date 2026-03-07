@@ -47,7 +47,7 @@ object AppModule {
     ): OkHttpClient = OkHttpClient.Builder()
         .addNetworkInterceptor(allowListInterceptor)  // network-level — cannot be bypassed
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .followRedirects(false) // don't silently follow redirects to unexpected domains
         .build()

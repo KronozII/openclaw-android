@@ -17,18 +17,18 @@ import com.champengine.android.storage.models.*
     version = 1,
     exportSchema = false
 )
-abstract class OpenClawDatabase : RoomDatabase() {
+abstract class ChampEngineDatabase : RoomDatabase() {
     abstract fun scopeTokenDao(): ScopeTokenDao
     abstract fun auditLogDao(): AuditLogDao
     abstract fun chatDao(): ChatDao
     abstract fun sandboxDao(): SandboxDao
 
     companion object {
-        fun create(context: Context): OpenClawDatabase {
+        fun create(context: Context): ChampEngineDatabase {
             return Room.databaseBuilder(
                 context,
-                OpenClawDatabase::class.java,
-                "openclaw_vault.db"
+                ChampEngineDatabase::class.java,
+                "champengine_vault.db"
             )
             .fallbackToDestructiveMigration()
             .build()

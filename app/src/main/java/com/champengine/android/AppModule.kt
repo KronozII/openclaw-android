@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.champengine.android.network.AllowListInterceptor
-import com.champengine.android.storage.db.OpenClawDatabase
+import com.champengine.android.storage.db.ChampEngineDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,14 +27,14 @@ object AppModule {
     @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context,
-    ): OpenClawDatabase {
-        return OpenClawDatabase.create(context)
+    ): ChampEngineDatabase {
+        return ChampEngineDatabase.create(context)
 }
 
-    @Provides fun provideScopeTokenDao(db: OpenClawDatabase) = db.scopeTokenDao()
-    @Provides fun provideAuditLogDao(db: OpenClawDatabase) = db.auditLogDao()
-    @Provides fun provideChatDao(db: OpenClawDatabase) = db.chatDao()
-    @Provides fun provideSandboxDao(db: OpenClawDatabase) = db.sandboxDao()
+    @Provides fun provideScopeTokenDao(db: ChampEngineDatabase) = db.scopeTokenDao()
+    @Provides fun provideAuditLogDao(db: ChampEngineDatabase) = db.auditLogDao()
+    @Provides fun provideChatDao(db: ChampEngineDatabase) = db.chatDao()
+    @Provides fun provideSandboxDao(db: ChampEngineDatabase) = db.sandboxDao()
 
     /**
      * OkHttp client — AllowList interceptor installed as a NETWORK interceptor

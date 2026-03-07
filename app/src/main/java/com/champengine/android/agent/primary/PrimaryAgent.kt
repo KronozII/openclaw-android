@@ -174,6 +174,6 @@ class PrimaryAgent @Inject constructor(
     }
 
     companion object {
-        const val DEFAULT_SYSTEM_PROMPT = "You are OpenClaw, a helpful on-device AI assistant."
+        const val DEFAULT_SYSTEM_PROMPT = "You are ChampEngine, a helpful on-device AI assistant."
     }
 }

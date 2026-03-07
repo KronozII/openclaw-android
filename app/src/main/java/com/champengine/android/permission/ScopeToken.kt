@@ -84,7 +84,7 @@ sealed class PermissionDecision {
  * HMAC signer using Android Keystore — tokens cannot be forged by agent code
  */
 object ScopeTokenSigner {
-    private const val KEYSTORE_ALIAS = "openclaw_scope_signing_key"
+    private const val KEYSTORE_ALIAS = "champengine_scope_signing_key"
     private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
     private const val HMAC_ALGORITHM = "HmacSHA256"
 

@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            OpenClawTheme {
+            ChampEngineTheme {
                 ChampEngineApp(client = champEngineClient)
             }
         }

@@ -44,7 +44,7 @@ class AllowListInterceptor @Inject constructor(
                 .request(request)
                 .protocol(okhttp3.Protocol.HTTP_1_1)
                 .code(403)
-                .message("Blocked by OpenClaw")
+                .message("Blocked by ChampEngine")
                 .body("{}".toResponseBody())
                 .build()
         }

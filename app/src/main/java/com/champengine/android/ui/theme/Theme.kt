@@ -9,7 +9,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// OpenClaw brand colors
+// ChampEngine brand colors
 val ClawGreen = Color(0xFF00FFB3)
 val ClawGreenDim = Color(0xFF00C88A)
 val ClawPurple = Color(0xFF7B5CFF)
@@ -40,15 +40,15 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun OpenClawTheme(content: @Composable () -> Unit) {
+fun ChampEngineTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkColorScheme,
-        typography = OpenClawTypography,
+        typography = ChampEngineTypography,
         content = content,
     )
 }
 
-val OpenClawTypography = Typography(
+val ChampEngineTypography = Typography(
     headlineLarge = TextStyle(
         fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Bold,

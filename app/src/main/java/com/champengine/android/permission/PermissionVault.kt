@@ -2,7 +2,7 @@ package com.champengine.android.permission
 
 import android.content.Context
 import android.util.Log
-import com.champengine.android.storage.db.OpenClawDatabase
+import com.champengine.android.storage.db.ChampEngineDatabase
 import com.champengine.android.storage.models.ScopeTokenEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -34,7 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class PermissionVault @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val db: OpenClawDatabase,
+    private val db: ChampEngineDatabase,
 ) {
     private val TAG = "PermissionVault"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

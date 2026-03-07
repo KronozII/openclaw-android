@@ -13,7 +13,7 @@ data class SkillManifest(
     val description: String,
     val category: SkillCategory,
     val version: String = "1.0.0",
-    val author: String = "OpenClaw",
+    val author: String = "ChampEngine",
     val systemPromptExtension: String = "",
     val tools: List<String> = emptyList(),
     val isBuiltin: Boolean = true,

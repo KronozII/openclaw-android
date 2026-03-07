@@ -58,7 +58,13 @@ fun OnboardingScreen(
         delay(800)
         status = "Connecting to ChampEngine$dots"
         delay(600)
-        val ok = client.ping()
+        var errorMsg = "unknown"
+        val ok = try {
+            client.ping()
+        } catch (e: Exception) {
+            errorMsg = e.javaClass.simpleName + ": " + (e.message ?: "null")
+            false
+        }
         isChecking = false
         if (ok) {
             isConnected = true
@@ -66,7 +72,7 @@ fun OnboardingScreen(
             delay(1000)
             onComplete()
         } else {
-            status = "Connection failed — check your internet"
+            status = "Failed: $errorMsg | endpoint: ${client.getEndpoint()}"
         }
     }
 

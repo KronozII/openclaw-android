@@ -84,7 +84,7 @@ fun OnboardingScreen(
             delay(1000)
             onComplete()
         } else {
-            status = "Failed: $errorMsg | endpoint: ${client.getEndpoint()}"
+            status = "Failed: ${client.lastPingError} | ${client.getEndpoint()}"
         }
     }
 

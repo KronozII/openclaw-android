@@ -51,6 +51,8 @@ class ChampEngineClient @Inject constructor(
     fun isUsingDefaults(): Boolean =
         getEndpoint() == DEFAULT_ENDPOINT && getToken() == DEFAULT_TOKEN
 
+    var lastPingError: String = "none"
+
     suspend fun ping(): Boolean {
         return try {
             val req = Request.Builder()
@@ -58,9 +60,11 @@ class ChampEngineClient @Inject constructor(
                 .addHeader("X-Champ-Token", getToken())
                 .get().build()
             val resp = http.newCall(req).execute()
+            lastPingError = "code=${resp.code}"
             resp.isSuccessful
         } catch (e: Exception) {
-            Log.w(TAG, "Ping failed: ${e.message}")
+            lastPingError = e.javaClass.simpleName + ": " + (e.message ?: "null") + " / cause: " + (e.cause?.javaClass?.simpleName ?: "null") + ": " + (e.cause?.message ?: "null")
+            Log.w(TAG, "Ping failed: $lastPingError")
             false
         }
     }

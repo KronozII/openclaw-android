@@ -26,10 +26,10 @@ val CHAMP_MODELS = listOf(
 )
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(client: ChampEngineClient) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val client = remember { ChampEngineClient(context) }
+
 
     var selectedModel by remember { mutableStateOf(client.getModel()) }
     var pingStatus by remember { mutableStateOf("") }

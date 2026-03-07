@@ -102,7 +102,7 @@ fun ChampEngineApp(client: ChampEngineClient) {
             composable("permissions") {
                 PermissionsScreen(onBack = { navController.popBackStack() })
             }
-            composable("settings")    { SettingsScreen() }
+            composable("settings")    { SettingsScreen(client = client) }
         }
     }
 }

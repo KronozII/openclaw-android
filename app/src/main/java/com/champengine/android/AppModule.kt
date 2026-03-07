@@ -49,6 +49,6 @@ object AppModule {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(false) // don't silently follow redirects to unexpected domains
+        //.followRedirects(false) // don't silently follow redirects to unexpected domains
         .build()
 }

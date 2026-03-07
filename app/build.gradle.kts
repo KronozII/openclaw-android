@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.openclaw.android"
+    namespace = "com.champengine.android"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.openclaw.android"
+        applicationId = "com.champengine.android"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

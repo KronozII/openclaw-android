@@ -61,8 +61,20 @@ fun OnboardingScreen(
         var errorMsg = "unknown"
         val ok = try {
             client.ping()
+        } catch (e: java.net.UnknownHostException) {
+            errorMsg = "DNS_FAIL: " + (e.message ?: "null")
+            false
+        } catch (e: java.net.ConnectException) {
+            errorMsg = "CONNECT_FAIL: " + (e.message ?: "null")
+            false
+        } catch (e: javax.net.ssl.SSLException) {
+            errorMsg = "SSL_FAIL: " + (e.message ?: "null")
+            false
+        } catch (e: java.io.IOException) {
+            errorMsg = "IO_FAIL: " + (e.message ?: "null")
+            false
         } catch (e: Exception) {
-            errorMsg = e.javaClass.simpleName + ": " + (e.message ?: "null")
+            errorMsg = e.javaClass.name + ": " + (e.message ?: "null") + " cause=" + (e.cause?.message ?: "null")
             false
         }
         isChecking = false

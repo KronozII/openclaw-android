@@ -20,7 +20,13 @@ class AllowListInterceptor @Inject constructor(
 ) : Interceptor {
 
     private val TAG = "AllowListInterceptor"
-    private val permanentAllowList = setOf("localhost", "127.0.0.1")
+    private val permanentAllowList = setOf(
+        "localhost",
+        "127.0.0.1",
+        "api.champengine.cloud",
+        "champengine.cloud",
+        "app.champengine.cloud"
+    )
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()

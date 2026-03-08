@@ -38,15 +38,21 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    val isReady      = agentState is AgentState.Ready
+    val isGenerating = agentState is AgentState.Generating
+    val isError      = agentState is AgentState.Error
+    val isConnecting = agentState is AgentState.Connecting
+
+    // Partial streaming text — visible while generating
+    val streamingText = (agentState as? AgentState.Generating)?.partial ?: ""
+
+    // Scroll to bottom on new message OR new streaming token
+    LaunchedEffect(messages.size, streamingText.length) {
+        val itemCount = messages.size + if (isGenerating) 1 else 0
+        if (itemCount > 0) listState.animateScrollToItem(itemCount - 1)
     }
 
     val topRequest = pendingRequests.firstOrNull()
-    val isReady = agentState is AgentState.Ready
-    val isGenerating = agentState is AgentState.Generating
-    val isError = agentState is AgentState.Error
-    val isConnecting = agentState is AgentState.Connecting
 
     Scaffold(
         containerColor = BgDark,
@@ -60,8 +66,8 @@ fun ChatScreen(
                                 .background(
                                     when {
                                         isReady || isGenerating -> ClawGreen
-                                        isError -> ClawRed
-                                        else -> TextMuted
+                                        isError                 -> ClawRed
+                                        else                    -> TextMuted
                                     },
                                     shape = RoundedCornerShape(4.dp),
                                 )
@@ -139,9 +145,9 @@ fun ChatScreen(
                             Text(
                                 when {
                                     agentState is AgentState.Frozen -> "Agent paused — review security alert"
-                                    isConnecting -> "Connecting to ChampEngine..."
-                                    isError -> "Connection error — tap retry"
-                                    else -> "Ask anything..."
+                                    isConnecting                    -> "Connecting to ChampEngine..."
+                                    isError                         -> "Connection error — tap retry"
+                                    else                            -> "Ask anything..."
                                 },
                                 color = TextMuted,
                                 fontSize = 14.sp,
@@ -182,7 +188,7 @@ fun ChatScreen(
                                 strokeWidth = 2.dp,
                             )
                             isError -> Icon(Icons.Default.Refresh, "Retry", tint = Color.White)
-                            else -> Icon(Icons.Default.Send, "Send")
+                            else    -> Icon(Icons.Default.Send, "Send")
                         }
                     }
                 }
@@ -207,7 +213,7 @@ fun ChatScreen(
                     onRetry = { viewModel.retryConnection() },
                     onSettings = onOpenSettings,
                 )
-                messages.isEmpty() -> EmptyStateView()
+                messages.isEmpty() && !isGenerating -> EmptyStateView()
                 else -> {
                     LazyColumn(
                         state = listState,
@@ -216,8 +222,17 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(messages) { message -> MessageBubble(message = message) }
-                        if (isGenerating) item { LoadingIndicator("Generating...") }
-                        if (isConnecting) item { LoadingIndicator("Connecting to ChampEngine...") }
+
+                        // ── Live streaming bubble ─────────────────
+                        if (isGenerating) {
+                            item {
+                                StreamingBubble(text = streamingText)
+                            }
+                        }
+
+                        if (isConnecting) {
+                            item { LoadingIndicator("Connecting to ChampEngine...") }
+                        }
                     }
                 }
             }
@@ -231,6 +246,60 @@ fun ChatScreen(
             }
         }
     }
+}
+
+// ── Streaming bubble — renders partial tokens live ────────────────
+@Composable
+fun StreamingBubble(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+    ) {
+        Surface(
+            color = Surface2Dark,
+            shape = RoundedCornerShape(
+                topStart = 4.dp, topEnd = 12.dp,
+                bottomStart = 12.dp, bottomEnd = 12.dp,
+            ),
+            modifier = Modifier.widthIn(max = 320.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (text.isBlank()) {
+                    // Dots animation while waiting for first token
+                    LoadingDots()
+                } else {
+                    Text(
+                        text = text,
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        lineHeight = 21.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Animated dots for pre-first-token wait ────────────────────────
+@Composable
+fun LoadingDots() {
+    var dotCount by remember { mutableStateOf(1) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(400)
+            dotCount = (dotCount % 3) + 1
+        }
+    }
+    Text(
+        text = "●".repeat(dotCount),
+        color = ClawGreen,
+        fontSize = 10.sp,
+        letterSpacing = 4.sp,
+    )
 }
 
 @Composable
@@ -301,7 +370,7 @@ fun EmptyStateView() {
 
 @Composable
 fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEntity) {
-    val isUser = message.role == "user"
+    val isUser     = message.role == "user"
     val isSentinel = message.role == "sentinel"
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -328,9 +397,9 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
                 color = if (isUser) ClawGreen.copy(alpha = 0.12f) else Surface2Dark,
                 shape = RoundedCornerShape(
                     topStart = if (isUser) 12.dp else 4.dp,
-                    topEnd = if (isUser) 4.dp else 12.dp,
+                    topEnd   = if (isUser) 4.dp  else 12.dp,
                     bottomStart = 12.dp,
-                    bottomEnd = 12.dp,
+                    bottomEnd   = 12.dp,
                 ),
                 border = if (isUser) BorderStroke(1.dp, ClawGreen.copy(alpha = 0.2f)) else null,
                 modifier = Modifier.widthIn(max = 320.dp),

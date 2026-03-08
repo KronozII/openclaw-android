@@ -40,14 +40,12 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
 
-    // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
-    // Show permission sheet if pending
     val topRequest = pendingRequests.firstOrNull()
 
     Scaffold(
@@ -60,13 +58,18 @@ fun ChatScreen(
                             modifier = Modifier
                                 .size(8.dp)
                                 .background(
-                                    if (agentState is AgentState.Ready) ClawGreen else TextMuted,
-                                    shape = RoundedCornerShape(4.dp)
+                                    when (agentState) {
+                                        is AgentState.Ready,
+                                        is AgentState.Generating -> ClawGreen
+                                        is AgentState.Error      -> ClawRed
+                                        else                     -> TextMuted
+                                    },
+                                    shape = RoundedCornerShape(4.dp),
                                 )
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "OPENCLAW",
+                            "CHAMPENGINE",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 14.sp,
                             letterSpacing = 3.sp,
@@ -91,9 +94,8 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    // Sentinel alert indicator
                     if (activeAlerts.isNotEmpty()) {
-                        IconButton(onClick = { /* show alerts */ }) {
+                        IconButton(onClick = { }) {
                             Badge(containerColor = ClawDanger) {
                                 Text("${activeAlerts.size}", fontSize = 10.sp)
                             }
@@ -124,10 +126,8 @@ fun ChatScreen(
                     .navigationBarsPadding()
                     .imePadding()
             ) {
-                // Model status bar
                 AgentStatusBar(agentState)
                 Spacer(Modifier.height(8.dp))
-
                 Row(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -138,13 +138,17 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f),
                         placeholder = {
                             Text(
-                                if (agentState is AgentState.Frozen) "Agent paused — review security alert"
-                                else "Ask anything...",
+                                when (agentState) {
+                                    is AgentState.Frozen     -> "Agent paused — review security alert"
+                                    is AgentState.Connecting -> "Connecting to ChampEngine..."
+                                    is AgentState.Error      -> "Connection error — check Settings"
+                                    else                     -> "Ask anything..."
+                                },
                                 color = TextMuted,
                                 fontSize = 14.sp,
                             )
                         },
-                        enabled = agentState !is AgentState.Frozen && agentState !is AgentState.LoadingModel,
+                        enabled = agentState is AgentState.Ready,
                         maxLines = 5,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ClawGreen,
@@ -158,7 +162,7 @@ fun ChatScreen(
                     )
                     FloatingActionButton(
                         onClick = {
-                            if (inputText.isNotBlank()) {
+                            if (inputText.isNotBlank() && agentState is AgentState.Ready) {
                                 viewModel.sendMessage(inputText)
                                 inputText = ""
                             }
@@ -185,7 +189,6 @@ fun ChatScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
 
-            // Threat alerts banner — shown at top, cannot be dismissed without review
             AnimatedVisibility(
                 visible = activeAlerts.isNotEmpty(),
                 enter = slideInVertically() + fadeIn(),
@@ -198,9 +201,8 @@ fun ChatScreen(
                 )
             }
 
-            // Chat messages
-            if (messages.isEmpty() && agentState is AgentState.Idle) {
-                EmptyStateView(onLoadModel = { viewModel.loadDefaultModel() })
+            if (messages.isEmpty()) {
+                EmptyStateView()
             } else {
                 LazyColumn(
                     state = listState,
@@ -211,26 +213,28 @@ fun ChatScreen(
                     items(messages) { message ->
                         MessageBubble(message = message)
                     }
-                    // Loading model indicator
-                    if (agentState is AgentState.LoadingModel) {
-                        item {
-                            LoadingIndicator("Loading model...")
-                        }
+                    if (agentState is AgentState.Generating) {
+                        item { LoadingIndicator("Generating...") }
+                    }
+                    if (agentState is AgentState.Connecting) {
+                        item { LoadingIndicator("Connecting to ChampEngine...") }
                     }
                 }
             }
 
-            // Permission request bottom sheet
             if (topRequest != null) {
                 PermissionRequestSheet(
                     request = topRequest,
-                    onDecision = { decision -> viewModel.resolvePermission(topRequest.requestId, decision) },
+                    onDecision = { decision ->
+                        viewModel.resolvePermission(topRequest.requestId, decision)
+                    },
                 )
             }
         }
     }
 }
 
+// ── Agent Status Bar ──────────────────────────────────────────────
 @Composable
 fun AgentStatusBar(state: AgentState) {
     Row(
@@ -238,12 +242,12 @@ fun AgentStatusBar(state: AgentState) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val (statusText, statusColor) = when (state) {
-            is AgentState.Idle -> "NO MODEL LOADED" to TextMuted
-            is AgentState.LoadingModel -> "LOADING MODEL..." to ClawWarn
-            is AgentState.Ready -> "ON-DEVICE · ${state.model.displayName.uppercase()}" to ClawGreen
+            is AgentState.Idle       -> "INITIALISING" to TextMuted
+            is AgentState.Connecting -> "CONNECTING..." to ClawWarn
+            is AgentState.Ready      -> "LIVE · ${state.model.uppercase()}" to ClawGreen
             is AgentState.Generating -> "GENERATING..." to ClawGreen
-            is AgentState.Frozen -> "⚠ FROZEN BY SENTINEL" to ClawDanger
-            is AgentState.Error -> "ERROR" to ClawDanger
+            is AgentState.Frozen     -> "⚠ FROZEN BY SENTINEL" to ClawDanger
+            is AgentState.Error      -> "ERROR · CHECK SETTINGS" to ClawDanger
         }
         Text(
             statusText,
@@ -255,7 +259,7 @@ fun AgentStatusBar(state: AgentState) {
         if (state is AgentState.Ready || state is AgentState.Generating) {
             Text("·", color = TextMuted, fontSize = 9.sp)
             Text(
-                "NO API CALLS",
+                "PRIVATE · NO DATA STORED",
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp,
                 letterSpacing = 2.sp,
@@ -265,6 +269,7 @@ fun AgentStatusBar(state: AgentState) {
     }
 }
 
+// ── Message Bubble ────────────────────────────────────────────────
 @Composable
 fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEntity) {
     val isUser = message.role == "user"
@@ -275,7 +280,6 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         if (isSentinel) {
-            // Sentinel messages have a distinct danger styling
             Surface(
                 color = ClawDanger.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(4.dp),
@@ -297,7 +301,8 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
                             color = ClawDanger,
                         )
                         Spacer(Modifier.height(4.dp))
-                        Text(message.content, color = TextPrimary, fontSize = 14.sp, lineHeight = 20.sp)
+                        Text(message.content, color = TextPrimary,
+                             fontSize = 14.sp, lineHeight = 20.sp)
                     }
                 }
             }
@@ -310,7 +315,9 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
                     bottomStart = 12.dp,
                     bottomEnd = 12.dp,
                 ),
-                border = if (isUser) BorderStroke(1.dp, ClawGreen.copy(alpha = 0.2f)) else null,
+                border = if (isUser)
+                    BorderStroke(1.dp, ClawGreen.copy(alpha = 0.2f))
+                else null,
                 modifier = Modifier.widthIn(max = 320.dp),
             ) {
                 Text(
@@ -325,17 +332,20 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
     }
 }
 
+// ── Empty State ───────────────────────────────────────────────────
 @Composable
-fun EmptyStateView(onLoadModel: () -> Unit) {
+fun EmptyStateView() {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("⚡", fontSize = 48.sp)
         Spacer(Modifier.height(16.dp))
         Text(
-            "ON-DEVICE AI",
+            "CHAMPENGINE",
             fontFamily = FontFamily.Monospace,
             fontSize = 11.sp,
             letterSpacing = 4.sp,
@@ -343,21 +353,20 @@ fun EmptyStateView(onLoadModel: () -> Unit) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "No cloud. No API. Everything runs here.",
+            "AI. Unchained.",
             color = TextPrimary,
             fontSize = 16.sp,
         )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onLoadModel,
-            colors = ButtonDefaults.buttonColors(containerColor = ClawGreen, contentColor = Color.Black),
-            shape = RoundedCornerShape(4.dp),
-        ) {
-            Text("LOAD MODEL", fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 2.sp)
-        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Private by design. Powerful by default.",
+            color = TextMuted,
+            fontSize = 13.sp,
+        )
     }
 }
 
+// ── Loading Indicator ─────────────────────────────────────────────
 @Composable
 fun LoadingIndicator(text: String) {
     Row(
@@ -365,7 +374,12 @@ fun LoadingIndicator(text: String) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(8.dp),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = ClawGreen, strokeWidth = 2.dp)
-        Text(text, color = TextMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+        CircularProgressIndicator(
+            modifier = Modifier.size(16.dp),
+            color = ClawGreen,
+            strokeWidth = 2.dp,
+        )
+        Text(text, color = TextMuted, fontSize = 13.sp,
+             fontFamily = FontFamily.Monospace)
     }
 }

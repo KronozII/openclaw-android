@@ -2,7 +2,7 @@ package com.champengine.android.agent.sandbox
 
 import android.content.Context
 import android.util.Log
-import com.champengine.android.agent.primary.PrimaryAgent
+import com.champengine.android.network.ChampEngineClient
 import com.champengine.android.permission.PermissionVault
 import com.champengine.android.permission.ScopeType
 import com.champengine.android.storage.db.SandboxDao
@@ -25,7 +25,7 @@ data class SandboxProject(
     val id: String,
     val name: String,
     val type: ProjectType,
-    val files: Map<String, String>, // filename -> content
+    val files: Map<String, String>,
     val entryPoint: String = "index.html",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
@@ -40,18 +40,10 @@ sealed class SandboxAction {
 
 enum class ExportFormat { ZIP, APK, HTML_BUNDLE }
 
-/**
- * SandboxBuilderAgent — manages the creation environment.
- *
- * The sandbox runs inside an isolated WebView. Code generated here:
- * - Cannot access device storage outside the sandbox VFS
- * - Has its own separate AllowList (sandbox scopes)
- * - Is never auto-deployed or auto-shared
- */
 @Singleton
 class SandboxBuilderAgent @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val primaryAgent: PrimaryAgent,
+    private val client: ChampEngineClient,
     private val vault: PermissionVault,
     private val sandboxDao: SandboxDao,
 ) {
@@ -70,18 +62,15 @@ class SandboxBuilderAgent @Inject constructor(
         sandboxDir.mkdirs()
     }
 
-    /**
-     * Create a new project from a template
-     */
     suspend fun createProject(name: String, type: ProjectType, description: String): SandboxProject {
         val id = UUID.randomUUID().toString()
         val projectDir = File(sandboxDir, id)
         projectDir.mkdirs()
 
         val files = when (type) {
-            ProjectType.WEB -> webTemplate(name, description)
+            ProjectType.WEB  -> webTemplate(name, description)
             ProjectType.GAME -> gameTemplate(name)
-            ProjectType.APP -> pwaTemplate(name, description)
+            ProjectType.APP  -> pwaTemplate(name, description)
         }
 
         files.forEach { (filename, content) ->
@@ -108,8 +97,7 @@ class SandboxBuilderAgent @Inject constructor(
     }
 
     /**
-     * Use the AI to modify code based on a natural language prompt.
-     * Uses the primary agent's loaded model — no network call.
+     * Generate code via ChampEngine server — codellama:13b for code tasks.
      */
     suspend fun generateCode(project: SandboxProject, prompt: String, filename: String): String {
         val currentCode = project.files[filename] ?: ""
@@ -117,21 +105,20 @@ class SandboxBuilderAgent @Inject constructor(
 
         log("🤖 Generating: $prompt")
 
-        // Use the primary agent's inference
-        // In practice, this streams tokens and returns the final code block
-        val sessionId = "sandbox_${project.id}"
+        val responseBuffer = StringBuilder()
+        client.streamChat(
+            messages = listOf("user" to fullPrompt),
+            systemPrompt = "You are a code assistant. Respond with ONLY the updated code. No explanation. No markdown fences.",
+            model = "codellama:13b",
+        ).collect { token ->
+            responseBuffer.append(token)
+        }
 
-        // Extract code from the AI response (look for ```html or ```js blocks)
-        // This is a simplified representation — in practice we'd collect the streaming events
-        val generatedCode = simulateCodeGeneration(prompt, currentCode, project.type)
-
-        log("✓ Code generated (${generatedCode.length} chars)")
-        return generatedCode
+        val generated = responseBuffer.toString().trim()
+        log("✓ Code generated (${generated.length} chars)")
+        return generated.ifBlank { currentCode }
     }
 
-    /**
-     * Update a file in the project
-     */
     suspend fun updateFile(project: SandboxProject, filename: String, content: String): SandboxProject {
         val projectDir = File(sandboxDir, project.id)
         File(projectDir, filename).writeText(content)
@@ -153,30 +140,23 @@ class SandboxBuilderAgent @Inject constructor(
         return updated
     }
 
-    /**
-     * Export project — always requires user to initiate via share sheet
-     */
     suspend fun exportAsZip(project: SandboxProject): File {
         log("📦 Preparing export...")
         val exportDir = File(context.cacheDir, "exports")
         exportDir.mkdirs()
         val zipFile = File(exportDir, "${project.name.replace(" ", "_")}.zip")
-
-        // In production: use java.util.zip to bundle project files
-        // For now, create a bundle HTML
         val bundleHtml = bundleAsHtml(project)
         zipFile.writeText(bundleHtml)
-
         log("✓ Export ready: ${zipFile.name}")
         return zipFile
     }
 
     private fun log(message: String) {
-        _buildLog.value = listOf("[${java.time.LocalTime.now().toString().take(8)}] $message") + _buildLog.value.take(49)
+        _buildLog.value = listOf("[${java.time.LocalTime.now().toString().take(8)}] $message") +
+                _buildLog.value.take(49)
     }
 
-    // ─── Templates ───────────────────────────────────────────────────────────
-
+    // ── Templates ─────────────────────────────────────────────────
     private fun webTemplate(name: String, description: String) = mapOf(
         "index.html" to """<!DOCTYPE html>
 <html lang="en">
@@ -244,12 +224,7 @@ function draw() {
   ctx.fillText('Score: ' + state.score, 12, 30);
 }
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-
+function loop() { update(); draw(); requestAnimationFrame(loop); }
 loop();""",
     )
 
@@ -273,11 +248,13 @@ loop();""",
 </body>
 </html>""",
         "manifest.json" to """{"name":"$name","short_name":"$name","start_url":"/","display":"standalone","background_color":"#0f0f1a","theme_color":"#00ffb3"}""",
-        "styles.css" to """* { box-sizing: border-box; } body { font-family: system-ui; background: #0f0f1a; color: #e8e8f0; margin: 0; }
+        "styles.css" to """* { box-sizing: border-box; }
+body { font-family: system-ui; background: #0f0f1a; color: #e8e8f0; margin: 0; }
 header { padding: 20px; background: #16162a; border-bottom: 1px solid #2a2a4a; }
 h1 { font-size: 1.5rem; color: #00ffb3; }
 main { padding: 20px; }""",
-        "app.js" to """// PWA App: $name\nconsole.log('$name initialized');""",
+        "app.js" to """// PWA App: $name
+console.log('$name initialized');""",
     )
 
     private fun bundleAsHtml(project: SandboxProject): String {
@@ -290,15 +267,14 @@ main { padding: 20px; }""",
             .replace("<script src=\"game.js\"></script>", "<script>$js</script>")
     }
 
-    private fun buildCodePrompt(prompt: String, currentCode: String, filename: String, type: ProjectType): String =
+    private fun buildCodePrompt(
+        prompt: String, currentCode: String,
+        filename: String, type: ProjectType,
+    ): String =
         """You are a code assistant working on a ${type.label} project.
 Current file ($filename):
-```
-${currentCode.take(2000)}
-```
-User request: $prompt
-Respond with ONLY the updated code for $filename. No explanation. No markdown fences."""
+$currentCode
 
-    // Placeholder for actual AI-driven generation (wired to PrimaryAgent.generate() in production)
-    private fun simulateCodeGeneration(prompt: String, currentCode: String, type: ProjectType): String = currentCode
+User request: $prompt
+Respond with ONLY the updated code for $filename."""
 }

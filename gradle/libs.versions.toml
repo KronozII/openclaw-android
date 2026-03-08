@@ -14,7 +14,6 @@ navigationCompose = "2.8.4"
 coroutines = "1.9.0"
 ksp = "2.0.21-1.0.27"
 securityCrypto = "1.1.0-alpha06"
-mediapipe = "0.10.14"
 accompanist = "0.36.0"
 datastore = "1.1.1"
 
@@ -43,7 +42,6 @@ retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = 
 retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
-mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipe" }
 androidx-datastore = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 [plugins]

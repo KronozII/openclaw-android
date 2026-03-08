@@ -81,7 +81,6 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.security.crypto)
-    implementation(libs.mediapipe.tasks.genai)
     implementation(libs.androidx.datastore)
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -11,15 +11,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.champengine.android.agent.primary.AgentState
-import com.champengine.android.agent.sentinel.ThreatAlert
-import com.champengine.android.agent.sentinel.ThreatLevel
 import com.champengine.android.ui.components.PermissionRequestSheet
 import com.champengine.android.ui.components.ThreatAlertBanner
 import com.champengine.android.ui.theme.*
@@ -41,12 +39,14 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
 
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
     val topRequest = pendingRequests.firstOrNull()
+    val isReady = agentState is AgentState.Ready
+    val isGenerating = agentState is AgentState.Generating
+    val isError = agentState is AgentState.Error
+    val isConnecting = agentState is AgentState.Connecting
 
     Scaffold(
         containerColor = BgDark,
@@ -58,11 +58,10 @@ fun ChatScreen(
                             modifier = Modifier
                                 .size(8.dp)
                                 .background(
-                                    when (agentState) {
-                                        is AgentState.Ready,
-                                        is AgentState.Generating -> ClawGreen
-                                        is AgentState.Error      -> ClawRed
-                                        else                     -> TextMuted
+                                    when {
+                                        isReady || isGenerating -> ClawGreen
+                                        isError -> ClawRed
+                                        else -> TextMuted
                                     },
                                     shape = RoundedCornerShape(4.dp),
                                 )
@@ -138,17 +137,17 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f),
                         placeholder = {
                             Text(
-                                when (agentState) {
-                                    is AgentState.Frozen     -> "Agent paused — review security alert"
-                                    is AgentState.Connecting -> "Connecting to ChampEngine..."
-                                    is AgentState.Error      -> "Connection error — check Settings"
-                                    else                     -> "Ask anything..."
+                                when {
+                                    agentState is AgentState.Frozen -> "Agent paused — review security alert"
+                                    isConnecting -> "Connecting to ChampEngine..."
+                                    isError -> "Connection error — tap retry"
+                                    else -> "Ask anything..."
                                 },
                                 color = TextMuted,
                                 fontSize = 14.sp,
                             )
                         },
-                        enabled = agentState is AgentState.Ready,
+                        enabled = isReady,
                         maxLines = 5,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ClawGreen,
@@ -162,25 +161,28 @@ fun ChatScreen(
                     )
                     FloatingActionButton(
                         onClick = {
-                            if (inputText.isNotBlank() && agentState is AgentState.Ready) {
-                                viewModel.sendMessage(inputText)
-                                inputText = ""
+                            when {
+                                isError -> viewModel.retryConnection()
+                                isReady && inputText.isNotBlank() -> {
+                                    viewModel.sendMessage(inputText)
+                                    inputText = ""
+                                }
                             }
                         },
                         modifier = Modifier.size(52.dp),
-                        containerColor = ClawGreen,
+                        containerColor = if (isError) ClawRed else ClawGreen,
                         contentColor = Color.Black,
                         shape = RoundedCornerShape(4.dp),
                         elevation = FloatingActionButtonDefaults.elevation(0.dp),
                     ) {
-                        if (agentState is AgentState.Generating) {
-                            CircularProgressIndicator(
+                        when {
+                            isGenerating || isConnecting -> CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 color = Color.Black,
                                 strokeWidth = 2.dp,
                             )
-                        } else {
-                            Icon(Icons.Default.Send, "Send")
+                            isError -> Icon(Icons.Default.Refresh, "Retry", tint = Color.White)
+                            else -> Icon(Icons.Default.Send, "Send")
                         }
                     }
                 }
@@ -188,7 +190,6 @@ fun ChatScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-
             AnimatedVisibility(
                 visible = activeAlerts.isNotEmpty(),
                 enter = slideInVertically() + fadeIn(),
@@ -200,28 +201,26 @@ fun ChatScreen(
                     onReview = { alert -> viewModel.reviewThreat(alert) },
                 )
             }
-
-            if (messages.isEmpty()) {
-                EmptyStateView()
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(messages) { message ->
-                        MessageBubble(message = message)
-                    }
-                    if (agentState is AgentState.Generating) {
-                        item { LoadingIndicator("Generating...") }
-                    }
-                    if (agentState is AgentState.Connecting) {
-                        item { LoadingIndicator("Connecting to ChampEngine...") }
+            when {
+                isError -> ErrorStateView(
+                    message = (agentState as AgentState.Error).message,
+                    onRetry = { viewModel.retryConnection() },
+                    onSettings = onOpenSettings,
+                )
+                messages.isEmpty() -> EmptyStateView()
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(messages) { message -> MessageBubble(message = message) }
+                        if (isGenerating) item { LoadingIndicator("Generating...") }
+                        if (isConnecting) item { LoadingIndicator("Connecting to ChampEngine...") }
                     }
                 }
             }
-
             if (topRequest != null) {
                 PermissionRequestSheet(
                     request = topRequest,
@@ -234,7 +233,6 @@ fun ChatScreen(
     }
 }
 
-// ── Agent Status Bar ──────────────────────────────────────────────
 @Composable
 fun AgentStatusBar(state: AgentState) {
     Row(
@@ -247,34 +245,64 @@ fun AgentStatusBar(state: AgentState) {
             is AgentState.Ready      -> "LIVE · ${state.model.uppercase()}" to ClawGreen
             is AgentState.Generating -> "GENERATING..." to ClawGreen
             is AgentState.Frozen     -> "⚠ FROZEN BY SENTINEL" to ClawDanger
-            is AgentState.Error      -> "ERROR · CHECK SETTINGS" to ClawDanger
+            is AgentState.Error      -> "CONNECTION ERROR" to ClawRed
         }
-        Text(
-            statusText,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 9.sp,
-            letterSpacing = 2.sp,
-            color = statusColor,
-        )
+        Text(statusText, fontFamily = FontFamily.Monospace, fontSize = 9.sp, letterSpacing = 2.sp, color = statusColor)
         if (state is AgentState.Ready || state is AgentState.Generating) {
             Text("·", color = TextMuted, fontSize = 9.sp)
-            Text(
-                "PRIVATE · NO DATA STORED",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 9.sp,
-                letterSpacing = 2.sp,
-                color = TextMuted,
-            )
+            Text("PRIVATE · NO DATA STORED", fontFamily = FontFamily.Monospace, fontSize = 9.sp, letterSpacing = 2.sp, color = TextMuted)
         }
     }
 }
 
-// ── Message Bubble ────────────────────────────────────────────────
+@Composable
+fun ErrorStateView(message: String, onRetry: () -> Unit, onSettings: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("⚠", fontSize = 48.sp)
+        Spacer(Modifier.height(16.dp))
+        Text("CONNECTION ERROR", fontFamily = FontFamily.Monospace, fontSize = 11.sp, letterSpacing = 4.sp, color = ClawRed)
+        Spacer(Modifier.height(8.dp))
+        Text(message, color = TextMuted, fontSize = 13.sp, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = ClawGreen),
+            shape = RoundedCornerShape(4.dp),
+        ) {
+            Text("RETRY", fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 2.sp, color = Color.Black)
+        }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onSettings) {
+            Text("Open Settings", color = TextMuted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+fun EmptyStateView() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("⚡", fontSize = 48.sp)
+        Spacer(Modifier.height(16.dp))
+        Text("CHAMPENGINE", fontFamily = FontFamily.Monospace, fontSize = 11.sp, letterSpacing = 4.sp, color = TextMuted)
+        Spacer(Modifier.height(8.dp))
+        Text("AI. Unchained.", color = TextPrimary, fontSize = 16.sp)
+        Spacer(Modifier.height(4.dp))
+        Text("Private by design. Powerful by default.", color = TextMuted, fontSize = 13.sp)
+    }
+}
+
 @Composable
 fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEntity) {
     val isUser = message.role == "user"
     val isSentinel = message.role == "sentinel"
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -286,23 +314,12 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
                 border = BorderStroke(1.dp, ClawDanger.copy(alpha = 0.3f)),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("🛡️", fontSize = 16.sp)
                     Column {
-                        Text(
-                            "SENTINEL",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 9.sp,
-                            letterSpacing = 2.sp,
-                            color = ClawDanger,
-                        )
+                        Text("SENTINEL", fontFamily = FontFamily.Monospace, fontSize = 9.sp, letterSpacing = 2.sp, color = ClawDanger)
                         Spacer(Modifier.height(4.dp))
-                        Text(message.content, color = TextPrimary,
-                             fontSize = 14.sp, lineHeight = 20.sp)
+                        Text(message.content, color = TextPrimary, fontSize = 14.sp, lineHeight = 20.sp)
                     }
                 }
             }
@@ -315,58 +332,15 @@ fun MessageBubble(message: com.champengine.android.storage.models.ChatMessageEnt
                     bottomStart = 12.dp,
                     bottomEnd = 12.dp,
                 ),
-                border = if (isUser)
-                    BorderStroke(1.dp, ClawGreen.copy(alpha = 0.2f))
-                else null,
+                border = if (isUser) BorderStroke(1.dp, ClawGreen.copy(alpha = 0.2f)) else null,
                 modifier = Modifier.widthIn(max = 320.dp),
             ) {
-                Text(
-                    message.content,
-                    modifier = Modifier.padding(12.dp),
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    lineHeight = 21.sp,
-                )
+                Text(message.content, modifier = Modifier.padding(12.dp), color = TextPrimary, fontSize = 14.sp, lineHeight = 21.sp)
             }
         }
     }
 }
 
-// ── Empty State ───────────────────────────────────────────────────
-@Composable
-fun EmptyStateView() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("⚡", fontSize = 48.sp)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "CHAMPENGINE",
-            fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            letterSpacing = 4.sp,
-            color = TextMuted,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "AI. Unchained.",
-            color = TextPrimary,
-            fontSize = 16.sp,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Private by design. Powerful by default.",
-            color = TextMuted,
-            fontSize = 13.sp,
-        )
-    }
-}
-
-// ── Loading Indicator ─────────────────────────────────────────────
 @Composable
 fun LoadingIndicator(text: String) {
     Row(
@@ -374,12 +348,7 @@ fun LoadingIndicator(text: String) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(8.dp),
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(16.dp),
-            color = ClawGreen,
-            strokeWidth = 2.dp,
-        )
-        Text(text, color = TextMuted, fontSize = 13.sp,
-             fontFamily = FontFamily.Monospace)
+        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = ClawGreen, strokeWidth = 2.dp)
+        Text(text, color = TextMuted, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
     }
 }

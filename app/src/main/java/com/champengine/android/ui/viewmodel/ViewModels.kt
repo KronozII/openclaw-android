@@ -15,12 +15,14 @@ import com.champengine.android.storage.db.AuditLogDao
 import com.champengine.android.storage.db.ChatDao
 import com.champengine.android.storage.models.ChatMessageEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
-// ─── Chat ─────────────────────────────────────────────────────────
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val client: ChampEngineClient,
@@ -31,10 +33,8 @@ class ChatViewModel @Inject constructor(
 
     private val _agentState = MutableStateFlow<AgentState>(AgentState.Idle)
     val agentState: StateFlow<AgentState> = _agentState.asStateFlow()
-
     val pendingRequests: StateFlow<List<PermissionRequest>> = vault.pendingRequests
     val activeAlerts: StateFlow<List<ThreatAlert>> = sentinel.activeAlerts
-
     private val currentSessionId = UUID.randomUUID().toString()
 
     val messages: StateFlow<List<ChatMessageEntity>> =
@@ -52,21 +52,30 @@ class ChatViewModel @Inject constructor(
                     updatedAt = System.currentTimeMillis(),
                 )
             )
-            // Verify server connection on init
-            _agentState.value = AgentState.Connecting
-            val connected = client.ping()
-            _agentState.value = if (connected)
-                AgentState.Ready(client.getModel())
-            else
-                AgentState.Error("Cannot reach ChampEngine servers")
+            connectWithRetry()
         }
     }
 
-    fun sendMessage(text: String) {
-        if (_agentState.value is AgentState.Frozen) return
+    private suspend fun connectWithRetry() {
+        _agentState.value = AgentState.Connecting
+        repeat(3) { attempt ->
+            delay(500L * (attempt + 1))
+            val connected = withContext(Dispatchers.IO) { client.ping() }
+            if (connected) {
+                _agentState.value = AgentState.Ready(client.getModel())
+                return
+            }
+        }
+        _agentState.value = AgentState.Error("Cannot reach ChampEngine servers")
+    }
 
+    fun retryConnection() {
+        viewModelScope.launch { connectWithRetry() }
+    }
+
+    fun sendMessage(text: String) {
+        if (_agentState.value !is AgentState.Ready) return
         viewModelScope.launch {
-            // Save user message to DB
             chatDao.insertMessage(
                 ChatMessageEntity(
                     id = UUID.randomUUID().toString(),
@@ -77,42 +86,36 @@ class ChatViewModel @Inject constructor(
                 )
             )
             chatDao.touchSession(currentSessionId, System.currentTimeMillis())
-
-            // Build conversation history for context
             val history = chatDao.observeMessages(currentSessionId)
-                .first()
-                .takeLast(20)
-                .map { it.role to it.content }
-
-            // Stream response from ChampEngine
+                .first().takeLast(20).map { it.role to it.content }
             _agentState.value = AgentState.Generating("")
             val responseBuffer = StringBuilder()
-
-            client.streamChat(
-                messages = history,
-                systemPrompt = SYSTEM_PROMPT,
-                model = client.getModel(),
-            ).collect { token ->
-                responseBuffer.append(token)
-                _agentState.value = AgentState.Generating(responseBuffer.toString())
-            }
-
-            // Save completed response
-            val fullResponse = responseBuffer.toString()
-            if (fullResponse.isNotBlank()) {
-                chatDao.insertMessage(
-                    ChatMessageEntity(
-                        id = UUID.randomUUID().toString(),
-                        sessionId = currentSessionId,
-                        role = "assistant",
-                        content = fullResponse,
-                        timestamp = System.currentTimeMillis(),
+            try {
+                client.streamChat(
+                    messages = history,
+                    systemPrompt = SYSTEM_PROMPT,
+                    model = client.getModel(),
+                ).collect { token ->
+                    responseBuffer.append(token)
+                    _agentState.value = AgentState.Generating(responseBuffer.toString())
+                }
+                val fullResponse = responseBuffer.toString()
+                if (fullResponse.isNotBlank()) {
+                    chatDao.insertMessage(
+                        ChatMessageEntity(
+                            id = UUID.randomUUID().toString(),
+                            sessionId = currentSessionId,
+                            role = "assistant",
+                            content = fullResponse,
+                            timestamp = System.currentTimeMillis(),
+                        )
                     )
-                )
-                chatDao.touchSession(currentSessionId, System.currentTimeMillis())
+                    chatDao.touchSession(currentSessionId, System.currentTimeMillis())
+                }
+                _agentState.value = AgentState.Ready(client.getModel())
+            } catch (e: Exception) {
+                _agentState.value = AgentState.Error("Message failed — tap retry")
             }
-
-            _agentState.value = AgentState.Ready(client.getModel())
         }
     }
 
@@ -132,7 +135,6 @@ class ChatViewModel @Inject constructor(
     }
 }
 
-// ─── Permissions ──────────────────────────────────────────────────
 @HiltViewModel
 class PermissionViewModel @Inject constructor(
     private val vault: PermissionVault,
@@ -140,7 +142,6 @@ class PermissionViewModel @Inject constructor(
 ) : ViewModel() {
     val allTokens = vault.allTokens()
     val auditLog = auditLogDao.observeRecent()
-
     fun revokeToken(tokenId: String) {
         viewModelScope.launch { vault.revokeToken(tokenId) }
     }
@@ -149,7 +150,6 @@ class PermissionViewModel @Inject constructor(
     }
 }
 
-// ─── Sandbox ──────────────────────────────────────────────────────
 @HiltViewModel
 class SandboxViewModel @Inject constructor(
     private val sandboxAgent: SandboxBuilderAgent,
@@ -157,10 +157,8 @@ class SandboxViewModel @Inject constructor(
     val activeProject = sandboxAgent.activeProject
     val buildLog = sandboxAgent.buildLog
     val allProjects = sandboxAgent.allProjects
-
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
-
     fun createProject(name: String, type: ProjectType, description: String) {
         viewModelScope.launch { sandboxAgent.createProject(name, type, description) }
     }
@@ -186,7 +184,6 @@ class SandboxViewModel @Inject constructor(
     }
 }
 
-// ─── Skills ───────────────────────────────────────────────────────
 @HiltViewModel
 class SkillsViewModel @Inject constructor(
     private val skillEngine: com.champengine.android.skill.SkillEngine,
@@ -205,7 +202,6 @@ class SkillsViewModel @Inject constructor(
     }
 }
 
-// ─── Memory ───────────────────────────────────────────────────────
 @HiltViewModel
 class MemoryViewModel @Inject constructor(
     private val memory: com.champengine.android.memory.LongTermMemory,

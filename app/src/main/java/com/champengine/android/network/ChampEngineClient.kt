@@ -25,16 +25,18 @@ class ChampEngineClient @Inject constructor(
 ) {
     private val TAG = "ChampEngineClient"
 
-    private val DEFAULT_ENDPOINT = "https://api.champengine.cloud"
-    private val DEFAULT_TOKEN    = "eb0845f1d07fa481e941e4733b90de348e17ef95afa60b7c4f524905bbe1fd2a"
-    private val DEFAULT_MODEL    = "llama3.2:3b"
+    private val DEFAULT_ENDPOINT    = "https://api.champengine.cloud"
+    private val DEFAULT_TOKEN       = "eb0845f1d07fa481e941e4733b90de348e17ef95afa60b7c4f524905bbe1fd2a"
+    private val DEFAULT_MODEL       = "llama3.2:3b"
+    private val DEFAULT_ROUTER_MODE = "auto"
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("champengine_config", Context.MODE_PRIVATE)
 
-    fun getEndpoint(): String = prefs.getString("endpoint", DEFAULT_ENDPOINT) ?: DEFAULT_ENDPOINT
-    fun getToken(): String    = prefs.getString("token", DEFAULT_TOKEN) ?: DEFAULT_TOKEN
-    fun getModel(): String    = prefs.getString("model", DEFAULT_MODEL) ?: DEFAULT_MODEL
+    fun getEndpoint(): String   = prefs.getString("endpoint", DEFAULT_ENDPOINT) ?: DEFAULT_ENDPOINT
+    fun getToken(): String      = prefs.getString("token", DEFAULT_TOKEN) ?: DEFAULT_TOKEN
+    fun getModel(): String      = prefs.getString("model", DEFAULT_MODEL) ?: DEFAULT_MODEL
+    fun getRouterMode(): String = prefs.getString("router_mode", DEFAULT_ROUTER_MODE) ?: DEFAULT_ROUTER_MODE
 
     fun saveCustomConfig(endpoint: String, token: String, model: String) {
         prefs.edit()
@@ -42,6 +44,10 @@ class ChampEngineClient @Inject constructor(
             .putString("token", token)
             .putString("model", model)
             .apply()
+    }
+
+    fun saveRouterMode(mode: String) {
+        prefs.edit().putString("router_mode", mode).apply()
     }
 
     fun resetToDefaults() {
@@ -92,6 +98,8 @@ class ChampEngineClient @Inject constructor(
         model: String? = null,
     ): Flow<String> = flow {
         val selectedModel = model ?: getModel()
+        val routerMode = getRouterMode()
+
         val msgs = JSONArray()
         if (systemPrompt.isNotBlank()) {
             msgs.put(JSONObject().put("role", "system").put("content", systemPrompt))
@@ -109,6 +117,7 @@ class ChampEngineClient @Inject constructor(
         val request = Request.Builder()
             .url("${getEndpoint()}/api/chat")
             .addHeader("X-Champ-Token", getToken())
+            .addHeader("X-Router-Mode", routerMode)
             .addHeader("Content-Type", "application/json")
             .post(body.toRequestBody("application/json".toMediaType()))
             .build()

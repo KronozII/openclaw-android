@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,42 +17,38 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// ── Smart Router Modes ─────────────────────────────────────────────
 val ROUTER_MODES = listOf(
     "auto"     to "Auto · ChampEngine picks the best model for each task",
     "fast"     to "Fast · Always use smallest/fastest model",
     "powerful" to "Powerful · Always use largest/best model",
 )
 
-// ── Model Role Descriptions (informational only) ──────────────────
 val MODEL_ROLES = listOf(
     "llama3.2:3b"      to "⚡ Fast Chat & Quick Questions",
     "phi3:mini"        to "⚡ Instant Responses",
-    "mistral:7b"       to "✍️  Writing & Creative Tasks",
-    "gemma2:9b"        to "⚖️  Balanced General Purpose",
+    "mistral:7b"       to "✍  Writing & Creative Tasks",
+    "gemma2:9b"        to "⚖  Balanced General Purpose",
     "llama3.1:8b"      to "🧠 Deep Reasoning",
     "mistral-nemo:12b" to "🧠 Best Quality Responses",
     "codellama:13b"    to "💻 Code Generation",
     "deepseek-r1:7b"   to "🔬 Complex Problem Solving",
-    "llava:7b"         to "👁️  Vision & Image Understanding",
+    "llava:7b"         to "👁  Vision & Image Understanding",
 )
 
 @Composable
 fun SettingsScreen(client: ChampEngineClient) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var routerMode by remember { mutableStateOf("auto") }
-    var pingStatus by remember { mutableStateOf("") }
-    var isTesting by remember { mutableStateOf(false) }
+    var routerMode      by remember { mutableStateOf(client.getRouterMode()) }
+    var pingStatus      by remember { mutableStateOf("") }
+    var isTesting       by remember { mutableStateOf(false) }
     var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoadingModels by remember { mutableStateOf(true) }
-    var showAdvanced by remember { mutableStateOf(false) }
-    var customEndpoint by remember { mutableStateOf(client.getEndpoint()) }
-    var customToken by remember { mutableStateOf("") }
-    var saved by remember { mutableStateOf(false) }
+    var showAdvanced    by remember { mutableStateOf(false) }
+    var customEndpoint  by remember { mutableStateOf(client.getEndpoint()) }
+    var customToken     by remember { mutableStateOf("") }
+    var saved           by remember { mutableStateOf(false) }
 
-    // Auto-load available models on screen open
     LaunchedEffect(Unit) {
         val models = withContext(Dispatchers.IO) { client.listModels() }
         availableModels = models
@@ -88,7 +83,6 @@ fun SettingsScreen(client: ChampEngineClient) {
                     )
                 }
 
-                // Live model count
                 if (isLoadingModels) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -108,7 +102,10 @@ fun SettingsScreen(client: ChampEngineClient) {
                     }
                 } else {
                     Text(
-                        "● ${availableModels.size} models online",
+                        if (availableModels.isNotEmpty())
+                            "● ${availableModels.size} models online"
+                        else
+                            "○ No models detected",
                         color = if (availableModels.isNotEmpty()) ClawGreen else ClawRed,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
@@ -117,15 +114,17 @@ fun SettingsScreen(client: ChampEngineClient) {
 
                 HorizontalDivider(color = BorderDark)
 
-                // Model roster
                 Text(
                     "ACTIVE MODELS",
                     color = TextMuted,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                 )
+
                 MODEL_ROLES.forEach { (modelId, role) ->
-                    val isOnline = availableModels.any { it.startsWith(modelId.substringBefore(":")) }
+                    val isOnline = availableModels.any {
+                        it.startsWith(modelId.substringBefore(":"))
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -144,7 +143,8 @@ fun SettingsScreen(client: ChampEngineClient) {
                     }
                 }
 
-                // Test connection button
+                HorizontalDivider(color = BorderDark)
+
                 OutlinedButton(
                     onClick = {
                         isTesting = true
@@ -223,7 +223,10 @@ fun SettingsScreen(client: ChampEngineClient) {
                     ) {
                         RadioButton(
                             selected = routerMode == modeId,
-                            onClick = { routerMode = modeId },
+                            onClick = {
+                                routerMode = modeId
+                                client.saveRouterMode(modeId)
+                            },
                             colors = RadioButtonDefaults.colors(
                                 selectedColor = ClawGreen,
                                 unselectedColor = TextMuted,
@@ -235,7 +238,7 @@ fun SettingsScreen(client: ChampEngineClient) {
             }
         }
 
-        // ── ADVANCED — BYOK or custom server ─────────────────────
+        // ── ADVANCED ─────────────────────────────────────────────
         Surface(color = SurfaceDark, shape = RoundedCornerShape(8.dp)) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -322,7 +325,7 @@ fun SettingsScreen(client: ChampEngineClient) {
                                 saved = true
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = ClawGreen.copy(alpha = 0.15f)
+                                containerColor = ClawGreen.copy(alpha = 0.15f),
                             ),
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.weight(1f),
@@ -340,6 +343,7 @@ fun SettingsScreen(client: ChampEngineClient) {
                                 client.resetToDefaults()
                                 customEndpoint = client.getEndpoint()
                                 customToken = ""
+                                routerMode = client.getRouterMode()
                                 saved = false
                             },
                             border = androidx.compose.foundation.BorderStroke(

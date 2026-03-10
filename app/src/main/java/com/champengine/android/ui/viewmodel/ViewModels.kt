@@ -210,3 +210,58 @@ class MemoryViewModel @Inject constructor(
     fun deleteMemory(id: String) = memory.deleteMemory(id)
     fun clearAll() = memory.clearAll()
 }
+
+data class ProjectUiState(
+    val jobs: List<com.champengine.android.network.Job> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
+
+@HiltViewModel
+class ProjectViewModel @Inject constructor(
+    private val client: ChampEngineClient,
+) : ViewModel() {
+
+    private val orchestratorClient by lazy {
+        com.champengine.android.network.OrchestratorClient(
+            baseUrl = client.getEndpoint(),
+            authToken = client.getToken()
+        )
+    }
+
+    private val _uiState = MutableStateFlow(ProjectUiState())
+    val uiState: StateFlow<ProjectUiState> = _uiState.asStateFlow()
+
+    init {
+        loadProjects()
+    }
+
+    fun loadProjects() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            orchestratorClient.listProjects()
+                .onSuccess { jobs ->
+                    _uiState.update { it.copy(jobs = jobs, isLoading = false) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isLoading = false, error = e.message) }
+                }
+        }
+    }
+
+    fun createProject(description: String, autonomy: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            orchestratorClient.createProject(description, autonomy)
+                .onSuccess { job ->
+                    _uiState.update { it.copy(
+                        jobs = listOf(job) + it.jobs,
+                        isLoading = false
+                    )}
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isLoading = false, error = e.message) }
+                }
+        }
+    }
+}

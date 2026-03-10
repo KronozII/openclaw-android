@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -18,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import com.champengine.android.network.ChampEngineClient
 import com.champengine.android.ui.screens.*
 import com.champengine.android.ui.theme.*
+import com.champengine.android.ui.viewmodel.ProjectViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -54,9 +56,9 @@ fun ChampEngineApp(client: ChampEngineClient) {
 
     val navItems = listOf(
         Triple("chat",        "💬", "Chat"),
+        Triple("projects",    "🚀", "Projects"),
         Triple("skills",      "⚡", "Skills"),
         Triple("memory",      "🧠", "Memory"),
-        Triple("permissions", "🔒", "Perms"),
         Triple("settings",    "⚙️", "Settings"),
     )
 
@@ -96,6 +98,10 @@ fun ChampEngineApp(client: ChampEngineClient) {
                     onOpenPermissions = { navController.navigate("permissions") },
                     onOpenSandbox = { navController.navigate("skills") },
                 )
+            }
+            composable("projects") {
+                val projectViewModel: ProjectViewModel = hiltViewModel()
+                ProjectScreen(viewModel = projectViewModel)
             }
             composable("skills")      { SkillsScreen() }
             composable("memory")      { MemoryScreen() }
